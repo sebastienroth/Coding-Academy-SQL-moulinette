@@ -41,13 +41,10 @@ def write_trace(trace, trace_name='trace.txt'):
 	"""Write in file trace.txt the complete output of the test
 	:param trace: A list containing complete logging of the testing
 	"""
-	n = 1
 	my_file = open(trace_name, 'w')
 	for line in trace:
-		my_file.write('exercice n°'+str(n)+'\n\n')
 		my_file.writelines(line)
 		my_file.write('\n')
-		n += 1
 	my_file.close()
 
 def read_arbo(arbo, folder):
@@ -110,7 +107,7 @@ def compute_delta(ref, test):
 def handler(signum, frame):
 	raise Exception('Timeout')
 
-def compute_moulinette(list_ref, list_test):
+def compute_moulinette(list_ref, list_test, trace_origin=[]):
 	"""Logic of the mouli.
 	Usage:
 		>>> ref, test = 'SQLDAY01_ref', 'SQLDAY01_test'
@@ -120,8 +117,10 @@ def compute_moulinette(list_ref, list_test):
 	fails = 0
 	fail = []
 	trace = []
+	trace.append(trace_origin)
 	for elem_ref, elem_test in zip(list_ref, list_test):
 		print('Correcting exercice n°{}'.format(elem_test[0]))
+		trace.append('Correcting exercice n°{}'.format(elem_test[0]))
 		ref = exec_sql_script(elem_ref[1]).splitlines()
 		test = exec_sql_script(elem_test[1]).splitlines()
 		signal.signal(signal.SIGALRM, handler)
@@ -157,7 +156,7 @@ def call_mouli_for_all(folder, ref_folder='test/SqlDay01/'):
 	a =	create_arbo(folder)
 	for files in a:
 		list_ref, list_test = set_folders(ref_folder, folder+files+'/')
-		trace = compute_moulinette(list_ref, list_test)
+		trace = compute_moulinette(list_ref, list_test, trace_origin=folder+files+'/')
 		write_trace(trace, folder+files+'/'+'trace.txt')
 
 if __name__ == "__main__":
