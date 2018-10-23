@@ -87,6 +87,8 @@ def set_folders(reference, test):
 	arbo_ref = create_arbo(folder_reference)
 	if '.git' in arbo_test:
 		arbo_test.remove('.git')
+	if 'trace.txt' in arbo_test:
+		arbo_test.remove('trace.txt')
 	list_ref = read_arbo(arbo_ref, folder_reference)
 	list_test = read_arbo(arbo_test, folder_test)
 	return list_ref, list_test
@@ -141,7 +143,9 @@ def compute_moulinette(list_ref, list_test):
 			print(bcolors.FAIL + 'Test CRASH [KO]', str(e), bcolors.ENDC)
 			trace.append('Test CRASH: ' + str(e))
 			pass
-	print(bcolors.WARNING + '\nEnd of the tests', fails, 'fails out of', len(list_ref), 'exercises\n', 'Exercices faux: ', fail)
+	t = ''.join(str(fail))
+	trace.append('\nEnd of the tests '+ str(fails)+ ' fails out of '+ str(len(list_test))+ ' exercises. Total is ' + str(len(list_ref))+ '\n'+ 'Exercices failed: '+ t)
+	print(bcolors.WARNING + '\nEnd of the tests', fails, 'fails out of', len(list_test), 'exercises\n', 'Exercices failed: ', fail)
 	print('\n\nSee trace.txt to view your errors' + bcolors.ENDC)
 	return trace
 
