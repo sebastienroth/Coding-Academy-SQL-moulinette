@@ -16,6 +16,22 @@ or
 
 `./sql-mouli.py <reference_folder> <tested_folder>`
 
+!!Not Tested:
+### To test all the projects:
+
+`./sql-mouli.py <folder_de_rendu>`
+
+rammassage/
+    project1/
+        ...
+    project2/
+        ...
+    project3/
+        ...
+    project4/
+        ...
+
+
 ### Prerequisites
 
 This script will make call to `mysql -u root --password=root coding -e "sql_statement"`
