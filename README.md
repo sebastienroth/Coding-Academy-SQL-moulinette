@@ -16,8 +16,7 @@ or
 
 `./sql-mouli.py <reference_folder> <tested_folder>`
 
-!!Not Tested:
-### To test all the projects:
+### To test all the projects: !!Not Tested:
 
 `./sql-mouli.py <folder_de_rendu>`
 
