@@ -2,6 +2,7 @@ import os
 import difflib
 import sys
 import subprocess
+import signal
 
 class bcolors:
     HEADER = '\033[95m'
@@ -20,13 +21,12 @@ def exec_sql_script(sql_statement):
 	:param sql_statement: A string with sql_statement to execute
 	:rtype: A string with the output of the sql_statement (if fail the sting contain the error code too).
 	"""
-	cmd = 'mysql -u root --password=root coding -e \"{}\"'.format(sql_statement)
+	cmd = 'mysql -u root --password=root coding -e'.split(' ')
+	cmd.append('{}'.format(sql_statement.replace('\n', ' ')))
 	try:
-		output = subprocess.check_output(
-			cmd, stderr=subprocess.STDOUT, shell=True, timeout=3,
-			universal_newlines=True)
+		output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 	except subprocess.CalledProcessError as exc:
-		return('Status : FAIL ' + str(exc.returncode) + ' ' + exc.output)
+		return('Status : FAIL ' + str(exc.returncode) + ' ' + str(exc.output))
 	else:
 		return('{}'.format(output))
 
@@ -37,12 +37,12 @@ def help(code):
 	print('USAGE\n\t\t./mouli-d01.py <dossier ref> <dossier test>')
 	sys.exit(code)
 
-def write_trace(trace):
+def write_trace(trace, trace_name='trace.txt'):
 	"""Write in file trace.txt the complete output of the test
 	:param trace: A list containing complete logging of the testing
 	"""
 	n = 1
-	my_file = open('trace.txt', 'w')
+	my_file = open(trace_name, 'w')
 	for line in trace:
 		my_file.write('exercice n°'+str(n)+'\n\n')
 		my_file.writelines(line)
@@ -65,7 +65,8 @@ def read_arbo(arbo, folder):
 	n = 1
 	for files in arbo:
 		with open(folder+files+'/'+files+'.sql', 'r') as f:
-			statement_list.append((n, f.read()))
+			statement = f.read()
+			statement_list.append((int(files[3:]), statement))
 		n += 1
 	return statement_list
 
@@ -77,42 +78,97 @@ def create_arbo(folder):
 	"""
 	return sorted(os.listdir(folder), key=str.lower)
 
+def set_folders(reference, test):
+	"""Sets list for ref and test
+	"""
+	folder_reference = reference
+	folder_test = test
+	arbo_test = create_arbo(folder_test)
+	arbo_ref = create_arbo(folder_reference)
+	if '.git' in arbo_test:
+		arbo_test.remove('.git')
+	list_ref = read_arbo(arbo_ref, folder_reference)
+	list_test = read_arbo(arbo_test, folder_test)
+	return list_ref, list_test
+
+def compute_delta(ref, test):
+	"""Compute the delta between ref and test using diffLib.
+	Usage:
+		>>> delta1, delta2 = compute_delta(ref, test)
+	:param ref: reference output.
+	:param test: test output.
+	:rtype delta1 and delta2 (string).
+	"""
+	diff = difflib.ndiff(ref, test)
+	delta1 = ''.join(x[2:] for x in diff if x.startswith('- '))
+	diff = difflib.ndiff(ref, test)
+	delta2 = ''.join(x[2:] for x in diff if x.startswith('+ '))
+	return delta1, delta2
+
+def handler(signum, frame):
+	raise Exception('Timeout')
+
+def compute_moulinette(list_ref, list_test):
+	"""Logic of the mouli.
+	Usage:
+		>>> ref, test = 'SQLDAY01_ref', 'SQLDAY01_test'
+		>>> list_ref, list_test = set_folders(ref, test)
+		>>> compute_moulinette(list_ref, list_test)
+	"""
+	fails = 0
+	fail = []
+	trace = []
+	for elem_ref, elem_test in zip(list_ref, list_test):
+		print('Correcting exercice n°{}'.format(elem_test[0]))
+		ref = exec_sql_script(elem_ref[1]).splitlines()
+		test = exec_sql_script(elem_test[1]).splitlines()
+		signal.signal(signal.SIGALRM, handler)
+		signal.alarm(10)
+		try:
+			delta1, delta2 = compute_delta(ref, test)
+			if delta1 or delta2:
+				fails += 1
+				fail.append(elem_test[0])
+				print(bcolors.FAIL + 'OUTPUT DIFFER [KO]\n' + bcolors.ENDC, 'you:\t\t', delta2[:200], '\nexpected:\t', delta1[:200], sep='')
+				trace.append('OUTPUT DIFFER [KO]\n' + 'you:\t\t ' + delta2 + ' ' + '\nexpected:\t ' + delta1)
+				trace.append('Your SQL statement is probably false\n>>> \"{}\"\n'.format(elem_test[1].strip('\n')))
+			else:
+				print(bcolors.OKGREEN + 'Test Passed [OK]' + bcolors.ENDC)
+				trace.append('Test Passed [OK]')
+				pass
+		except Exception as e:
+			fail.append(elem_test[0])
+			print(bcolors.FAIL + 'Test CRASH [KO]', str(e), bcolors.ENDC)
+			trace.append('Test CRASH: ' + str(e))
+			pass
+	print(bcolors.WARNING + '\nEnd of the tests', fails, 'fails out of', len(list_ref), 'exercises\n', 'Exercices faux: ', fail)
+	print('\n\nSee trace.txt to view your errors' + bcolors.ENDC)
+	return trace
+
+def call_mouli_for_all(folder, ref_folder='test/SqlDay01/'):
+	"""this function will call the moulinette for all student in folder
+	if this function is called no reference is given so the reference folder is by default ''
+	:param folder: A string that contain the name of the folder for all students
+	"""
+	a =	create_arbo(folder)
+	for files in a:
+		list_ref, list_test = set_folders(ref_folder, folder+files+'/')
+		trace = compute_moulinette(list_ref, list_test)
+		write_trace(trace, folder+files+'/'+'trace.txt')
+
 if __name__ == "__main__":
 	if '-h' in sys.argv[1:]:
 		help(0)
 	try:
-		if len(sys.argv) != 3:
+		if len(sys.argv) == 2:
+			call_mouli_for_all(sys.argv[1])
+			exit(0)
+		if len(sys.argv) > 3 or len(sys.argv) < 2:
 			raise Exception('Invalid number of arguments')
-		folder_reference = sys.argv[1]
-		folder_test = sys.argv[2]
-		arbo_test = create_arbo(folder_test)
-		arbo_ref = create_arbo(folder_reference)
-		list_ref = read_arbo(arbo_ref, folder_reference)
-		list_test = read_arbo(arbo_test, folder_test)
-	except Exception as e:	
+		list_ref, list_test = set_folders(sys.argv[1], sys.argv[2])
+	except Exception as e:
 		print('Error:', e)	
 		help(84)
-
-	fails = 0
-	trace = []	
-	for elem_ref, elem_test in zip(list_ref, list_test):
-		print('Correcting exercice n°{}'.format(elem_ref[0]))
-		ref = exec_sql_script(elem_ref[1]).splitlines()
-		test = exec_sql_script(elem_test[1]).splitlines()
-		diff = difflib.ndiff(ref, test)
-		delta1 = ''.join(x[2:] for x in diff if x.startswith('- '))
-		diff = difflib.ndiff(ref, test)
-		delta2 = ''.join(x[2:] for x in diff if x.startswith('+ '))
-		if delta1 or delta2:
-			fails += 1
-			print(bcolors.FAIL + 'OUTPUT DIFFER [KO]\n' + bcolors.ENDC, 'you:\t\t', delta2, '\nexpected:\t', delta1, sep='')
-			trace.append('OUTPUT DIFFER [KO]\n' + 'you:\t\t ' + delta2 + ' ' + '\nexpected:\t ' + delta1)
-			trace.append('Your SQL statement is probably false\n>>> \"{}\"\n'.format(elem_test[1].strip('\n')))
-		else:
-			print(bcolors.OKGREEN + 'Test Passed [OK]' + bcolors.ENDC)
-			trace.append('Test Passed [OK]')
-	
+	trace = compute_moulinette(list_ref, list_test)
 	write_trace(trace)
-	print(bcolors.WARNING + '\nEnd of the tests', fails, 'fails out of', len(list_ref), 'exercises')
-	print('\n\nSee trace.txt to view your errors' + bcolors.ENDC)
 	sys.exit(0)
