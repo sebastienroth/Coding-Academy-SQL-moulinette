@@ -22,13 +22,19 @@ or
 `./sql-mouli.py <folder_de_rendu>`
 
 rammassage/
+
     project1/
+
         ...
+
     project2/
+
         ...
     project3/
+
         ...
     project4/
+    
         ...
 
 
