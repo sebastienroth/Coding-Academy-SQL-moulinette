@@ -1,6 +1,6 @@
 # CODING MOULINETTE SQL
 
-Moulinette en python pour les jours 1 et 2 de SQL à la coding_academy
+Python Moulinette: SQL Days 1 and 2 in coding_academy
 
 ## Getting Started
 
