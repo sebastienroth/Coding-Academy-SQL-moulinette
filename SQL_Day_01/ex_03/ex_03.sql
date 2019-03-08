@@ -1,0 +1,1 @@
+SELECT curdate() AS Date;
